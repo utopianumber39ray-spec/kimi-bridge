@@ -1,0 +1,14 @@
+[Unit]
+Description=Kimi bridge packaged independently in @ROOT@
+After=network-online.target nv-playground-browser.service
+Wants=network-online.target nv-playground-browser.service
+[Service]
+WorkingDirectory=@ROOT@
+Environment=KIMI_BRIDGE_PORT=8120
+Environment=KIMI_CDP=http://127.0.0.1:9333
+Environment=KIMI_DEFAULT_EFFORT=none
+ExecStart=@PYTHON@ @ROOT@/kimi-playground-bridge.py
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=default.target

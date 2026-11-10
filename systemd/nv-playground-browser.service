@@ -1,0 +1,15 @@
+[Unit]
+Description=Headless Chromium with existing NVIDIA session
+[Service]
+Environment=TZ=Asia/Baghdad
+Type=simple
+ExecStart=/usr/lib/chromium/chromium --headless=new --remote-debugging-port=9333 --remote-allow-origins=* --user-data-dir=@HOME@/.cache/nvprofile --no-first-run --no-default-browser-check --disable-gpu --disable-blink-features=AutomationControlled --window-size=1440,900 "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36" about:blank
+ExecStartPost=@PYTHON@ @ROOT@/nv-browser-harden.py
+# Chromium >=156 treats every unquoted positional arg as a second target and
+# refuses to start headless ("Multiple targets are not supported"). Keep the
+# user-agent in double quotes. Bound the post-start hardening wait as well.
+TimeoutStartSec=45
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=default.target

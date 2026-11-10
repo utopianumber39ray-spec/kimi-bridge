@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+dump/
+*.log
+# Secrets: never commit browser cookies, session dumps, or env files
+*ookie*.json
+*.cookie
+*.cookies
+.env
+*.pem
+*.key

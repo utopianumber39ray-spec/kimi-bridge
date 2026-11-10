@@ -1,0 +1,6 @@
+[Unit]
+Description=Watchdog for the Kimi bridge and background NVIDIA page
+[Service]
+Type=oneshot
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+ExecStart=@PYTHON@ @ROOT@/kimi-bridge-watchdog.py
