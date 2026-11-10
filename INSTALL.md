@@ -190,7 +190,8 @@ systemctl --user restart kimi-playground
 | `KIMI_SITEKEY` | مفتاح hCaptcha للصفحة | مفتاح widget |
 | `KIMI_TIMEOUT` | `900` | أقصى مدة طلب (ثانية) |
 | `KIMI_IDLE_TIMEOUT` | `120` | أقصى خمول في البث (ثانية) |
-| `KIMI_MAX_STREAM_MB` | `48` | حد حجم البث |
+| `KIMI_MAX_STREAM_MB` | `8` | حد حجم البث (يمنع استجابات التفكير الجامحة) |
+| `KIMI_CONCURRENCY` | `1` | عدد طلبات NVIDIA المتزامنة؛ ارفعه فقط إن كانت سعتك تسمح |
 | `KIMI_DEFAULT_EFFORT` | `none` | `reasoning_effort` الافتراضي |
 | `KIMI_USE_MAX_OUTPUT` | `1` | رفع سقف الإخراج إلى 65536 |
 | `KIMI_TOKEN_POOL` | `3` | حجم مخزون توكن hCaptcha |

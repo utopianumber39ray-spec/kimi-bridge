@@ -31,7 +31,12 @@ MODEL = os.environ.get("KIMI_MODEL", "moonshotai/kimi-k3.1-pro")
 PORT = int(os.environ.get("KIMI_BRIDGE_PORT", "8120"))
 TOTAL_TIMEOUT = float(os.environ.get("KIMI_TIMEOUT", "900"))
 IDLE_TIMEOUT = float(os.environ.get("KIMI_IDLE_TIMEOUT", "120"))
-MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "48")) * 1_000_000)
+MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "8")) * 1_000_000)
+# One upstream slot by default: NVIDIA's shared inference pool rejects parallel
+# requests with HTTP 500 "Pool#acquire pending", and concurrent hCaptcha mints
+# trigger challenge storms. Raise only if your account really has more capacity.
+CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "1")))
+_slots = threading.BoundedSemaphore(CONCURRENCY)
 DUMP_DIR = os.environ.get("KIMI_DUMP_DIR", "")
 
 
@@ -452,6 +457,11 @@ class Handler(BaseHTTPRequestHandler):
         dump("req", json.dumps(req, ensure_ascii=False))
 
         want_stream = bool(req.get("stream"))
+        waited = time.time()
+        _slots.acquire()
+        if time.time() - waited > 0.5:
+            log("queued %.0fs waiting for a free upstream slot (limit %d)"
+                % (time.time() - waited, CONCURRENCY))
         try:
             self._serve(req, want_stream)
         except CdpError as e:
@@ -462,6 +472,8 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             log(f"error: {e!r}")
             self._fail(500, str(e))
+        finally:
+            _slots.release()
 
     def _fail(self, status, message):
         """Report an error without corrupting an already-open SSE response."""
