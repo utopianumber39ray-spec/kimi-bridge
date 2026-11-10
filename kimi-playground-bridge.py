@@ -31,11 +31,10 @@ MODEL = os.environ.get("KIMI_MODEL", "moonshotai/kimi-k3.1-pro")
 PORT = int(os.environ.get("KIMI_BRIDGE_PORT", "8120"))
 TOTAL_TIMEOUT = float(os.environ.get("KIMI_TIMEOUT", "900"))
 IDLE_TIMEOUT = float(os.environ.get("KIMI_IDLE_TIMEOUT", "120"))
-MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "8")) * 1_000_000)
-# Upstream slots: four parallel turns by default (one more than the three
-# hCaptcha mint slots, so a waiting mint never blocks a running upstream call),
-# while keeping a bound so a stuck turn cannot pile up unbounded fetches.
-CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "4")))
+MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "64")) * 1_000_000)
+# Upstream slots: ten parallel turns by default, while keeping a bound so a
+# stuck turn cannot pile up unbounded fetches inside the page.
+CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "10")))
 _slots = threading.BoundedSemaphore(CONCURRENCY)
 DUMP_DIR = os.environ.get("KIMI_DUMP_DIR", "")
 
@@ -632,7 +631,8 @@ class Handler(BaseHTTPRequestHandler):
                     log("aborting runaway response: %.1f MB" % (n_bytes / 1e6))
                     if want_stream and started:
                         self._chunk_write("data: " + json.dumps(
-                            {"error": {"message": "response exceeded %d MB, aborted" % MAX_STREAM_BYTES,
+                            {"error": {"message": "response exceeded %.0f MB, aborted"
+                             % (MAX_STREAM_BYTES / 1_000_000),
                                        "type": "runaway_response"}}) + "\n\n")
                         self._chunk_end()
                     return False
