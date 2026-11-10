@@ -32,10 +32,10 @@ PORT = int(os.environ.get("KIMI_BRIDGE_PORT", "8120"))
 TOTAL_TIMEOUT = float(os.environ.get("KIMI_TIMEOUT", "900"))
 IDLE_TIMEOUT = float(os.environ.get("KIMI_IDLE_TIMEOUT", "120"))
 MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "8")) * 1_000_000)
-# One upstream slot by default: NVIDIA's shared inference pool rejects parallel
-# requests with HTTP 500 "Pool#acquire pending", and concurrent hCaptcha mints
-# trigger challenge storms. Raise only if your account really has more capacity.
-CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "1")))
+# Upstream slots: one per hCaptcha mint slot (TOKEN_POOL=3). NVIDIA serves
+# parallel playground calls for this session; keep it bounded so a stuck turn
+# can never pile up unbounded fetches inside the page.
+CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "3")))
 _slots = threading.BoundedSemaphore(CONCURRENCY)
 DUMP_DIR = os.environ.get("KIMI_DUMP_DIR", "")
 
