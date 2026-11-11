@@ -33,7 +33,7 @@
 cd /home/ai/kimi-bridge
 python3 verify_local.py
 # استخدم مفسّر يحتوي websocket-client وrequests عند الحاجة:
-/home/ai/anu_ai/.venv/bin/python verify_local.py
+/home/ai/kimi-bridge/.venv/bin/python verify_local.py
 ```
 
 - `verify_local.py` يفحص الصحة وCDP وصفحة Playground بدون restart.
@@ -44,7 +44,7 @@ python3 verify_local.py
 
 ```sh
 KIMI_CDP=http://127.0.0.1:9333 \
-  /home/ai/anu_ai/.venv/bin/python /home/ai/kimi-bridge/kimi-playground-bridge.py
+  /home/ai/kimi-bridge/.venv/bin/python /home/ai/kimi-bridge/kimi-playground-bridge.py
 ```
 
 للتشغيل بمنفذ مختلف مع **نفس** جلسة CDP 9333: `KIMI_BRIDGE_PORT=8121 KIMI_CDP=http://127.0.0.1:9333` ثم شغّل البرنامج. لا تعمل `install.sh` عندها لأنه يستبدل الخدمة المشتركة على 8120. طلبات كل عميل منفصلة؛ الحساب وسعة NVIDIA مشتركان.
@@ -65,7 +65,7 @@ systemctl --user restart kimi-playground.service
 ## المراقبة والفحص
 
 ```sh
-/home/ai/anu_ai/.venv/bin/python verify_local.py
+/home/ai/kimi-bridge/.venv/bin/python verify_local.py
 systemctl --user status kimi-bridge-watchdog.timer
 journalctl --user -u kimi-bridge-watchdog.service -n 30 --no-pager
 ```
@@ -98,5 +98,6 @@ journalctl --user -u kimi-bridge-watchdog.service -n 30 --no-pager
 - **نفذ المهمة كاملة من أولها لآخرها بدون أي سؤال**: لا تتوقف لطلب إذن، ولا تطرح أي سؤال استشاري، ولا تعيد أي اختيار للمستخدم. إن اختفى الحل المعتاد، اختر الحل المعقول واكمل، وتسجيل ما فعلته في التقرير النهائي.
 
 ## ملاحظات
-- Kimi Code Web و`kimi-code-web`/`kimi-code-tunnel` مُعادت لتثبيتها بناءً على طلب المستخدم (واجهة على 58627 وتكشف عبر Cloudflare مع bearer auth مفعّل ونفق غير محلول). لا تغلقها إلا بطلب صريح.
+- Kimi Code CLI (`kimi web` على 58627، خلف Cloudflare Quick Tunnel) يستخدم المزود `kimi-bridge` عبر هذا الجسر والسياق الآن 262144 (256k) في `~/.kimi-code/config.toml`، `opencode.json` و`~/.dsh/cordis.patch.yml`. OpenCode 2.2.7 موجود أيضًا (provider `kimi` عبر الجسر). المهارات في `~/.kimi-code/skills` (Kimi) وفي `~/.config/opencode/skills` (OpenCode)، وMCP في `~/.kimi-code/mcp.json` و`~/.config/opencode/opencode.json`.
+- الويب الحالي: خدمة OpenCode المُدارة (`opencode-managed.service`, 49374) مع نفق OpenTunnel: `https://e4a3dbce8c1c9d13.lysbagodm5pq.opentunnel.xyz`، دخول `opencode` + كلمة المرور من `opencode service get password`. حُذفت وحدتا `opencode-web` و`opencode-tunnel` لأن Cloudflare Quick Tunnel يحجب SSE فتبقى الواجهة هيكلًا فارغًا. مراقب: `opencode-managed-watchdog.timer` كل دقيقتين.
 - **السقف** output 65536 (لا يجبر النموذج على توليدها كلها): يسمح بالتفكير ثم ترك مساحة للجواب/الأدوات. `max` maps to high to reduce endless reasoning.

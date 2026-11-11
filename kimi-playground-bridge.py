@@ -257,7 +257,7 @@ IMAGE_PLACEHOLDER = "[earlier image omitted to stay within the playground image 
 # parallel — necessary when several dsh sessions fire at once.
 TOKEN_TTL = float(os.environ.get("KIMI_TOKEN_TTL", "100"))
 ACTIVE_WINDOW = float(os.environ.get("KIMI_ACTIVE_WINDOW", "120"))
-TOKEN_POOL = int(os.environ.get("KIMI_TOKEN_POOL", "3"))
+TOKEN_POOL = int(os.environ.get("KIMI_TOKEN_POOL", "4"))
 _cache_lock = threading.Lock()
 _pool = []  # [(token, minted_at)] oldest first
 _last_req = [0.0]
@@ -435,7 +435,7 @@ class Handler(BaseHTTPRequestHandler):
                 "data": [{
                     "id": MODEL, "object": "model", "created": int(time.time()),
                     "owned_by": "moonshotai (nvidia playground bridge)",
-                    "context_length": 1048576,
+                    "context_length": 262144,
                 }],
             })
         if self.path.rstrip("/").endswith("/health"):
@@ -730,11 +730,15 @@ class Handler(BaseHTTPRequestHandler):
             if not any((ch.get("delta") or {}).get("tool_calls") for ch in choices):
                 out.append(blk + "\n\n")
                 continue
+            finish_reason = None
+            frags = []
             for ch in choices:
                 d = ch.get("delta") or {}
                 tcs = d.get("tool_calls") or []
                 if not tcs:
                     continue
+                if ch.get("finish_reason"):
+                    finish_reason = ch["finish_reason"]
                 for tc in tcs:
                     idx = tc.get("index", 0)
                     fn = tc.get("function") or {}
@@ -746,14 +750,23 @@ class Handler(BaseHTTPRequestHandler):
                     announce = dict(obj)
                     announce["choices"] = [dict(ch, delta=dict(d, tool_calls=[{
                         "index": idx, "id": cid, "type": "function",
-                        "function": {"name": fn.get("name", ""), "arguments": ""}}]))]
-                    out.append("data: " + json.dumps(announce) + "\n\n")
+                        "function": {"name": fn.get("name", ""), "arguments": ""}}]),
+                        finish_reason=None)]
+                    frags.append(announce)
                     # (2) arguments fragment only: no repeated id/name
                     full = dict(obj)
                     full["choices"] = [dict(ch, delta=dict(d, tool_calls=[{
                         "index": idx,
-                        "function": {"arguments": fn.get("arguments", "")}}]))]
-                    out.append("data: " + json.dumps(full) + "\n\n")
+                        "function": {"arguments": fn.get("arguments", "")}}]),
+                        finish_reason=None)]
+                    frags.append(full)
+            # NVIDIA sometimes packs finish_reason into the final tool delta.
+            # Emitting it on the first split fragment makes the next fragment
+            # look like "content after the finish reason" to strict clients.
+            if finish_reason and frags:
+                frags[-1]["choices"][0]["finish_reason"] = finish_reason
+            for frag in frags:
+                out.append("data: " + json.dumps(frag) + "\n\n")
         return "".join(out)
 
 

@@ -9,3 +9,5 @@ dump/
 .env
 *.pem
 *.key
+
+.venv/
