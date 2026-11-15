@@ -66,12 +66,15 @@ def resolve_model(name):
 def upstream_for(cfg):
     return "https://buildapi.ngc.nvidia.com/v2/predict/models/qc69jvmznzxy/" + cfg["slug"]
 PORT = int(os.environ.get("KIMI_BRIDGE_PORT", "8120"))
-TOTAL_TIMEOUT = float(os.environ.get("KIMI_TIMEOUT", "900"))
+# Kimi streams ~10 tok/s and NVIDIA packs whole tool calls into one chunk, so a
+# long turn can legitimately run well past 15 minutes.
+TOTAL_TIMEOUT = float(os.environ.get("KIMI_TIMEOUT", "3600"))
 IDLE_TIMEOUT = float(os.environ.get("KIMI_IDLE_TIMEOUT", "120"))
 MAX_STREAM_BYTES = int(float(os.environ.get("KIMI_MAX_STREAM_MB", "64")) * 1_000_000)
-# Upstream slots: fifty parallel turns by default, while keeping a bound so a
-# stuck turn cannot pile up unbounded fetches inside the page.
-CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "50")))
+# Upstream slots. Every stream shares one playground tab (and its HTTP/2
+# connection to NVIDIA), so one network drop kills all of them at once, and a
+# wide fan-out saturates NVIDIA's pool (Pool#acquire 500s). Keep it small.
+CONCURRENCY = max(1, int(os.environ.get("KIMI_CONCURRENCY", "6")))
 _slots = threading.BoundedSemaphore(CONCURRENCY)
 # Per-model admission limits can be added here if a model's upstream queue
 # saturates; other models keep the global limit.
@@ -858,6 +861,18 @@ class Handler(BaseHTTPRequestHandler):
                     self._chunk_write(payload)
             else:
                 stream["chunks"].append(payload)
+        else:
+            # The loop ran out of time without __END__ (no break). Ending the
+            # body silently made clients report "stream closed before
+            # response.completed"; say what happened instead.
+            log("upstream exceeded total timeout of %.0fs; aborting" % TOTAL_TIMEOUT)
+            self._retryable = False
+            if want_stream and started:
+                self._chunk_write("data: " + json.dumps(
+                    {"error": {"message": "response exceeded the bridge total timeout (%ds)" % TOTAL_TIMEOUT,
+                               "type": "upstream_timeout"}}) + "\n\n")
+                self._chunk_end()
+            return False
 
         if want_stream:
             dump("stream", buf)
